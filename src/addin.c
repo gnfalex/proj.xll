@@ -11,12 +11,22 @@
 
 // PROJ
 #include <proj.h>
-#define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
-#include <proj_api.h>
-#define PROJ_CODEPAGE CP_ACP
+#if PROJ_VERSION_MAJOR < 8
+  #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
+  #include <proj_api.h>
+#else
+  #include <stdlib.h>
+  #include <math.h>
+#endif
+#if PROJ_VERSION_MAJOR <7
+  #define PROJ_CODEPAGE CP_ACP
+#else
+  #define PROJ_CODEPAGE CP_UTF8
+#endif
 
 #include "util.h"
 #include "epsg.h"
+#include "addin.h"
 
 #define rgWorksheetFuncsRows 4
 #define rgWorksheetFuncsCols 14
@@ -244,8 +254,11 @@ __declspec(dllexport) LPXLOPER12 WINAPI projVersion(LPXLOPER12 x)
     static XLOPER12 xResult;
 
     xResult.xltype = xltypeStr;
+#if PROJ_VERSION_MAJOR < 8
     xResult.val.str = new_xl12string(pj_get_release());
-    
+#else
+    xResult.val.str = new_xl12string(proj_info().release);
+#endif
     return (LPXLOPER12)&xResult;
 }
 
@@ -255,6 +268,9 @@ __declspec(dllexport) LPXLOPER12 WINAPI projVersion(LPXLOPER12 x)
 
 __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const char* dst, const double x, const double y, const WORD type)
 {
+#if PROJ_VERSION_MAJOR >= 8
+    return projTransform_api6(src, dst, x, y, type);
+#else
     static XLOPER12 xResult;
 
     //Get XLL full path, cut parent folder and use as default path to it.
@@ -263,7 +279,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
     Excel12f(xlGetName, &xXLL, 0);
     cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
     cutFileNameFromPath(cDir);
-    proj_context_set_search_paths (NULL,1,&cDir);
+    proj_context_set_search_paths (PJ_DEFAULT_CTX,1,&cDir);
     Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
     free(cDir);
 
@@ -308,6 +324,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
         pj_free(proj_dst);
 
     return (LPXLOPER12)&xResult;
+#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -326,7 +343,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
     Excel12f(xlGetName, &xXLL, 0);
     cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
     cutFileNameFromPath(cDir);
-    proj_context_set_search_paths (NULL,1,&cDir);
+    proj_context_set_search_paths (PJ_DEFAULT_CTX,1,&cDir);
     Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
     free(cDir);
 

@@ -46,7 +46,7 @@ all: xll
 
 xll: "$(BUILDDIR)" $(OBJECTS)
 	link /nologo /out:"$(BUILDDIR)\$(XLLNAME)" /libpath:"$(XLLSDK_LIBPATH)" /libpath:"$(XLLSDK_FRAMEWRK_LIBPATH)" /libpath:"$(PROJ_LIBPATH)" \
-	XLCALL32.LIB frmwrk32.lib proj.lib user32.lib sqlite3.lib \
+	XLCALL32.LIB frmwrk32.lib proj.lib user32.lib sqlite3.lib shell32.lib ole32.lib \
 	/def:"src\addin.def" /machine:x86 /dll "$(BUILDDIR)\addin.obj" "$(BUILDDIR)\util.obj"
 
 .c.obj:
