@@ -8,4 +8,5 @@ EXPORTS
 	xlAutoRemove
 	projVersion
 	projTransform
+	projTransform_api6
 	projEPSG

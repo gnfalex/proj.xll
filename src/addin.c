@@ -10,13 +10,14 @@
 #include <FRAMEWRK.H>
 
 // PROJ
+#include <proj.h>
 #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
 #include <proj_api.h>
 
 #include "util.h"
 #include "epsg.h"
 
-#define rgWorksheetFuncsRows 3
+#define rgWorksheetFuncsRows 4
 #define rgWorksheetFuncsCols 14
 
 static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
@@ -54,6 +55,22 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"Output flag: 1 = X, 2 = Y"
     },
     {
+        L"projTransform_api6",
+        L"UCCBBH",
+        L"PROJ.TRANSFORMV6",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Transform X / Y points from source coordinate system to destination coordinate system.", 
+        L"Source coordinate system",
+        L"Destination coordinate system",
+        L"X coordinate",
+        L"Y coordinate",
+        L"Output flag: 1= Longitude 2 = Latitude, 3 = X, 4 = Y"
+    },
+    {
         L"projEPSG",
         L"UJ",
         L"EPSG",
@@ -82,6 +99,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
 **
 ** UDFs:
 ** - projTransform
+** - projTransform_api6
 ** - projVersion
 ** - projEPSG
 */
@@ -277,6 +295,58 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
         pj_free(proj_src);
     if (proj_dst != NULL)
         pj_free(proj_dst);
+
+    return (LPXLOPER12)&xResult;
+}
+
+// ----------------------------------------------------------------------------
+// PROJ.TRANSFORM6
+// ----------------------------------------------------------------------------
+
+__declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, const char* dst, const double x, const double y, const WORD type)
+{
+    static XLOPER12 xResult;
+    PJ *P;
+    PJ_COORD c, c_out;
+
+    P = proj_create_crs_to_crs(PJ_DEFAULT_CTX,
+                               src,
+                               dst,
+                               NULL);
+    if (P==0) {
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrNum; // Error in pj_transform
+        return (LPXLOPER12)&xResult;
+    }
+
+    {
+        PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
+        if( 0 == P_for_GIS )  {
+            proj_destroy(P);
+            xResult.xltype = xltypeErr;
+            xResult.val.err = xlerrNum; // Error in pj_transform
+            return (LPXLOPER12)&xResult;
+        }
+        proj_destroy(P);
+        P = P_for_GIS;
+    }
+
+    c.lpzt.z = 0.0;
+    c.lpzt.t = HUGE_VAL;
+    c.lpzt.lam = x;
+    c.lpzt.phi = y;
+    c_out = proj_trans(P, PJ_FWD, c);
+    xResult.xltype = xltypeNum;
+    switch (type){
+      case 1: xResult.val.num = c_out.lp.lam; break;
+      case 2: xResult.val.num = c_out.lp.phi; break;
+      case 3: xResult.val.num = c_out.xy.x; break;
+      case 4: xResult.val.num = c_out.xy.y; break;
+      default:
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrValue; // Invalid argument
+    }
+    proj_destroy(P);
 
     return (LPXLOPER12)&xResult;
 }
