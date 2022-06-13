@@ -16,7 +16,7 @@
 CFLAGS = /nologo /O2 /W3 /WX /EHsc /MT /Zc:wchar_t /Zc:inline /Gd /TC
 
 # Build Artifacts
-BUILDDIR = ..\build\
+BUILDDIR = .\build\
 
 # Installation Directory
 INSTDIR = %USERPROFILE%\AppData\Roaming\Microsoft\AddIns\
@@ -35,7 +35,7 @@ PROJ_INCLUDE = $(PROJ_DIR)\include
 # Target
 XLLNAME = proj.xll
 
-SOURCES = addin.c util.c
+SOURCES = src\addin.c src\util.c
 
 OBJECTS = $(SOURCES:.c=.obj)
 
@@ -46,8 +46,8 @@ all: xll
 
 xll: "$(BUILDDIR)" $(OBJECTS)
 	link /nologo /out:"$(BUILDDIR)\$(XLLNAME)" /libpath:"$(XLLSDK_LIBPATH)" /libpath:"$(XLLSDK_FRAMEWRK_LIBPATH)" /libpath:"$(PROJ_LIBPATH)" \
-	XLCALL32.LIB frmwrk32.lib proj.lib user32.lib \
-	/def:"addin.def" /machine:x86 /dll "$(BUILDDIR)\addin.obj" "$(BUILDDIR)\util.obj"
+	XLCALL32.LIB frmwrk32.lib proj.lib user32.lib sqlite3.lib \
+	/def:"src\addin.def" /machine:x86 /dll "$(BUILDDIR)\addin.obj" "$(BUILDDIR)\util.obj"
 
 .c.obj:
 	cl /c $(CFLAGS) /I"$(XLLSDK_INCLUDE)" /I"$(PROJ_INCLUDE)" /Fo"$(BUILDDIR)\\" $<
