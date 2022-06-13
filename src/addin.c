@@ -1,9 +1,11 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #define VC_EXTRALEAN
+#define _USE_MATH_DEFINES
 
 #include <ctype.h>
 #include <windows.h>
+#include <math.h>
 
 // XLL
 #include <XLCALL.H>
@@ -11,12 +13,12 @@
 
 // PROJ
 #include <proj.h>
+#include <geodesic.h>
 #if PROJ_VERSION_MAJOR < 8
   #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
   #include <proj_api.h>
 #else
   #include <stdlib.h>
-  #include <math.h>
 #endif
 #if PROJ_VERSION_MAJOR <7
   #define PROJ_CODEPAGE CP_ACP
@@ -28,8 +30,8 @@
 #include "epsg.h"
 #include "addin.h"
 
-#define rgWorksheetFuncsRows 4
-#define rgWorksheetFuncsCols 14
+#define rgWorksheetFuncsRows 7
+#define rgWorksheetFuncsCols 15
 
 static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
 {
@@ -47,7 +49,8 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"",                                    // LPXLOPER12 pxArgumentHelp2
         L"",                                    // LPXLOPER12 pxArgumentHelp3
         L"",                                    // LPXLOPER12 pxArgumentHelp4
-        L""                                     // LPXLOPER12 pxArgumentHelp5
+        L"",                                    // LPXLOPER12 pxArgumentHelp5
+        L""                                     // LPXLOPER12 pxArgumentHelp6
     },
     {
         L"projTransform",
@@ -58,12 +61,13 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"PROJ",
         L"",
         L"",
-        L"Transform X / Y points from source coordinate system to destination coordinate system.", 
+        L"Transform X / Y points from source coordinate system to destination coordinate system.",
         L"Source coordinate system",
         L"Destination coordinate system",
         L"X coordinate",
         L"Y coordinate",
-        L"Output flag: 1 = X, 2 = Y"
+        L"Output flag: 1 = X, 2 = Y",
+        L""
     },
     {
         L"projTransform_api6",
@@ -74,12 +78,13 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"PROJ",
         L"",
         L"",
-        L"Transform X / Y points from source coordinate system to destination coordinate system.", 
+        L"Transform X / Y points from source coordinate system to destination coordinate system.",
         L"Source coordinate system",
         L"Destination coordinate system",
         L"X coordinate",
         L"Y coordinate",
-        L"Output flag: 1= Longitude 2 = Latitude, 3 = X, 4 = Y"
+        L"Output flag: 1= Longitude 2 = Latitude, 3 = X, 4 = Y",
+        L""
     },
     {
         L"projEPSG",
@@ -94,6 +99,58 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"EPSG code",
         L"",
         L"",
+        L"",
+        L"",
+        L""
+    },
+    {
+        L"projGeodInv",
+        L"UCBBBBH",
+        L"PROJ.GEOD_INV",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Show distance, azimuth and reverse azimuth between two points on geod.",
+        L"Coordinate system",
+        L"X1 coordinate",
+        L"Y1 coordinate",
+        L"X2 coordinate",
+        L"Y2 coordinate",
+        L"Output flag: 1= Distance 2 = Azimuth, 3 = Reverse azimuth"
+    },
+    {
+        L"projGeodDir",
+        L"UCBBBBH",
+        L"PROJ.GEOD_DIR",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Show coordinates of point by distance and azimuth from another point.",
+        L"Coordinate system",
+        L"X coordinate",
+        L"Y coordinate",
+        L"Azimuth",
+        L"Distance",
+        L"Output flag: 1= Longitude 2 = Latitude"
+    },
+    {
+        L"projExec",
+        L"UCBBH",
+        L"PROJ.EXEC",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Execute PROJ4 string",
+        L"PROJ4 string",
+        L"X coordinate",
+        L"Y coordinate",
+        L"Output flag: 1= Longitude 2 = Latitude",
         L"",
         L""
     }
@@ -113,6 +170,9 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
 ** - projTransform_api6
 ** - projVersion
 ** - projEPSG
+** - projGeodInv
+** - projGeodFor
+** - projExec
 */
 
 // Excel calls xlAutoOpen when it loads the XLL.
@@ -132,7 +192,7 @@ __declspec(dllexport) int WINAPI xlAutoOpen(void)
 
     Excel12f(xlGetName, &xDLL, 0);
 
-    for (i=0; i < rgWorksheetFuncsRows; i++) 
+    for (i=0; i < rgWorksheetFuncsRows; i++)
     {
         Excel12f(xlfRegister, 0, 1 + rgWorksheetFuncsCols,
             (LPXLOPER12)&xDLL,
@@ -149,12 +209,13 @@ __declspec(dllexport) int WINAPI xlAutoOpen(void)
             (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][10]),
             (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][11]),
             (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][12]),
-            (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][13]));
+            (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][13]),
+            (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][14]));
     }
 
     /* Free the XLL filename */
     Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
-    
+
     return 1;
 }
 
@@ -193,9 +254,9 @@ __declspec(dllexport) LPXLOPER12 WINAPI xlAutoRegister12(LPXLOPER12 pxName)
     xRegId.xltype = xltypeErr;
     xRegId.val.err = xlerrValue;
 
-    for (i = 0; i < rgWorksheetFuncsRows; i++) 
+    for (i = 0; i < rgWorksheetFuncsRows; i++)
     {
-        if (!lpwstricmp(rgWorksheetFuncs[i][0], pxName->val.str)) 
+        if (!lpwstricmp(rgWorksheetFuncs[i][0], pxName->val.str))
         {
             Excel12f(xlGetName, &xDLL, 0);
 
@@ -214,8 +275,9 @@ __declspec(dllexport) LPXLOPER12 WINAPI xlAutoRegister12(LPXLOPER12 pxName)
                 (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][10]),
                 (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][11]),
                 (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][12]),
+                (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][13]),
                 (LPXLOPER12)TempStr12(rgWorksheetFuncs[i][13]));
-                
+
             /* Free the XLL filename */
             Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
 
@@ -273,15 +335,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
 #else
     static XLOPER12 xResult;
 
-    //Get XLL full path, cut parent folder and use as default path to it.
-    XLOPER12 xXLL;
-    char * cDir;
-    Excel12f(xlGetName, &xXLL, 0);
-    cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
-    cutFileNameFromPath(cDir);
-    proj_context_set_search_paths (PJ_DEFAULT_CTX,1,&cDir);
-    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
-    free(cDir);
+    setXLLFolderAsProjDB();
 
     projPJ proj_src, proj_dst;
     proj_src = pj_init_plus(src);
@@ -317,7 +371,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
         xResult.xltype = xltypeErr;
         xResult.val.err = xlerrNum; // Error in pj_transform
     }
-    
+
     if (proj_src != NULL)
         pj_free(proj_src);
     if (proj_dst != NULL)
@@ -337,15 +391,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
     PJ *P;
     PJ_COORD c, c_out;
 
-    //Get XLL full path, cut parent folder and use as default path to it.
-    XLOPER12 xXLL;
-    char * cDir;
-    Excel12f(xlGetName, &xXLL, 0);
-    cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
-    cutFileNameFromPath(cDir);
-    proj_context_set_search_paths (PJ_DEFAULT_CTX,1,&cDir);
-    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
-    free(cDir);
+    setXLLFolderAsProjDB();
 
     P = proj_create_crs_to_crs(PJ_DEFAULT_CTX,
                                src,
@@ -396,7 +442,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
 __declspec(dllexport) LPXLOPER12 WINAPI projEPSG(const int code)
 {
     static XLOPER12 xResult;
-    
+
     wchar_t *projStr = epsgLookup(code);
 
     if (projStr != NULL) {
@@ -409,4 +455,150 @@ __declspec(dllexport) LPXLOPER12 WINAPI projEPSG(const int code)
     }
 
     return (LPXLOPER12)&xResult;
+}
+
+// ----------------------------------------------------------------------------
+// geod
+// ----------------------------------------------------------------------------
+
+__declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src,const double x1, const double y1,const double x2, const double y2,const WORD type)
+{
+    static XLOPER12 xResult;
+    PJ *P,*Ellips;
+    struct geod_geodesic g;
+    double a, invf, dist=0, az1=0, az2=0;
+
+    setXLLFolderAsProjDB();
+
+    P = proj_create(PJ_DEFAULT_CTX,src);
+    if (P==0) {
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrNum; // Error in pj_transform
+        return (LPXLOPER12)&xResult;
+    }
+
+    Ellips = proj_get_ellipsoid(PJ_DEFAULT_CTX,P);
+    if (Ellips==0) {
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrNum;
+        proj_destroy(P);
+        return (LPXLOPER12)&xResult;
+    }
+
+    proj_ellipsoid_get_parameters(PJ_DEFAULT_CTX,Ellips,&a, 0, 0, &invf);
+    proj_destroy(P); proj_destroy(Ellips);
+
+    geod_init(&g, a, 1/invf);
+    geod_inverse(&g,x1,y1,x2,y2,&dist,&az1,&az2);
+
+    xResult.xltype = xltypeNum;
+    switch (type){
+      case 1: xResult.val.num = dist; break;
+      case 2: xResult.val.num = az1 ; break;
+      case 3: xResult.val.num = az2 ; break;
+      default:
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrValue; // Invalid argument
+    }
+    return (LPXLOPER12)&xResult;
+}
+
+
+__declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src,const double x1, const double y1, const double az1, const double dist, const WORD type)
+{
+    static XLOPER12 xResult;
+    PJ *P, *Ellips;
+    struct geod_geodesic g;
+    double a, invf, x2, y2, az2;
+
+
+    setXLLFolderAsProjDB();
+
+    P = proj_create(PJ_DEFAULT_CTX,src);
+    if (P==0) {
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrNum;
+        return (LPXLOPER12)&xResult;
+    }
+    Ellips = proj_get_ellipsoid(PJ_DEFAULT_CTX,P);
+    if (Ellips==0) {
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrNum;
+        proj_destroy(P);
+        return (LPXLOPER12)&xResult;
+    }
+    proj_ellipsoid_get_parameters(PJ_DEFAULT_CTX,Ellips,&a, 0, 0, &invf);
+    proj_destroy(P); proj_destroy(Ellips);
+
+    geod_init(&g, a, 1/invf);
+    geod_direct(&g,x1,y1,az1,dist,&x2,&y2,&az2);
+
+    xResult.xltype = xltypeNum;
+    switch (type){
+      case 1: xResult.val.num = x2; break;
+      case 2: xResult.val.num = y2; break;
+      default:
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrValue; // Invalid argument
+    }
+
+    return (LPXLOPER12)&xResult;
+}
+
+__declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x, const double y, const WORD type)
+{
+    static XLOPER12 xResult;
+    PJ *P;
+    PJ_COORD c, c_out;
+
+    setXLLFolderAsProjDB();
+
+    P = proj_create(PJ_DEFAULT_CTX,src);
+    if (P==0) {
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrNum; // Error in pj_transform
+        return (LPXLOPER12)&xResult;
+    }
+
+    {
+        PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
+        if( 0 == P_for_GIS )  {
+            proj_destroy(P);
+            xResult.xltype = xltypeErr;
+            xResult.val.err = xlerrNum; // Error in pj_transform
+            return (LPXLOPER12)&xResult;
+        }
+        proj_destroy(P);
+        P = P_for_GIS;
+    }
+
+    c.lpzt.z = 0.0;
+    c.lpzt.t = HUGE_VAL;
+    c.lpzt.lam = x;
+    c.lpzt.phi = y;
+    c_out = proj_trans(P, PJ_FWD, c);
+    xResult.xltype = xltypeNum;
+    switch (type){
+      case 1: xResult.val.num = c_out.lp.lam; break;
+      case 2: xResult.val.num = c_out.lp.phi; break;
+      case 3: xResult.val.num = c_out.xy.x; break;
+      case 4: xResult.val.num = c_out.xy.y; break;
+      default:
+        xResult.xltype = xltypeErr;
+        xResult.val.err = xlerrValue; // Invalid argument
+    }
+    proj_destroy(P);
+
+    return (LPXLOPER12)&xResult;
+}
+
+void setXLLFolderAsProjDB(){
+    XLOPER12 xXLL;
+    char * cDir;
+    Excel12f(xlGetName, &xXLL, 0);
+    cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
+    cutFileNameFromPath(cDir);
+    proj_context_set_search_paths (PJ_DEFAULT_CTX,1,&cDir);
+    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
+    free(cDir);
 }

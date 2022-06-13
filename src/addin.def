@@ -10,3 +10,6 @@ EXPORTS
 	projTransform
 	projTransform_api6
 	projEPSG
+	projGeodInv
+	projGeodDir
+	projExec
