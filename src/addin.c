@@ -13,6 +13,7 @@
 #include <proj.h>
 #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
 #include <proj_api.h>
+#define PROJ_CODEPAGE CP_ACP
 
 #include "util.h"
 #include "epsg.h"
@@ -256,6 +257,16 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
 {
     static XLOPER12 xResult;
 
+    //Get XLL full path, cut parent folder and use as default path to it.
+    XLOPER12 xXLL;
+    char * cDir;
+    Excel12f(xlGetName, &xXLL, 0);
+    cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
+    cutFileNameFromPath(cDir);
+    proj_context_set_search_paths (NULL,1,&cDir);
+    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
+    free(cDir);
+
     projPJ proj_src, proj_dst;
     proj_src = pj_init_plus(src);
     proj_dst = pj_init_plus(dst);
@@ -308,6 +319,16 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
     static XLOPER12 xResult;
     PJ *P;
     PJ_COORD c, c_out;
+
+    //Get XLL full path, cut parent folder and use as default path to it.
+    XLOPER12 xXLL;
+    char * cDir;
+    Excel12f(xlGetName, &xXLL, 0);
+    cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
+    cutFileNameFromPath(cDir);
+    proj_context_set_search_paths (NULL,1,&cDir);
+    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
+    free(cDir);
 
     P = proj_create_crs_to_crs(PJ_DEFAULT_CTX,
                                src,

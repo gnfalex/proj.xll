@@ -35,3 +35,32 @@ wchar_t *new_xl12string(const char *text)
     p[len + 1] = 0; // now it is
     return p;
 }
+
+// Create null-terminated MultiByte string from counted Unicode wchar string
+char *xl12string2multibyte (const wchar_t *text, UINT cp)
+{
+    wchar_t  *inbuff;
+    size_t  len_inbuff, len_outbuff;
+    char *outbuff;
+
+    len_inbuff = text[0];
+    inbuff = (wchar_t *) malloc ( (len_inbuff + 2) * sizeof (wchar_t) );
+    memcpy (inbuff, (text + 1), (len_inbuff) * sizeof(wchar_t));
+    inbuff[len_inbuff] = 0;
+
+    // Convert to Encoding ()
+    len_outbuff = WideCharToMultiByte(cp,0,inbuff,-1,NULL,0,NULL,NULL);
+    outbuff = malloc(len_outbuff);
+    WideCharToMultiByte(cp,0,inbuff,-1,outbuff,len_outbuff,NULL,NULL);
+
+    free(inbuff);
+    return outbuff;
+}
+
+int cutFileNameFromPath(char *fpath){
+  int i;
+  for (i=strlen(fpath)-1;i>1;i--)
+    if (fpath[i]=='\\'||fpath[i]==0)
+      {fpath[i] = 0; break;}
+  return i;
+}
