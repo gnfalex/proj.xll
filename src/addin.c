@@ -132,7 +132,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
     },
     {
         L"projExec",
-        L"UCBBH",
+        L"UCBBBBH",
         L"PROJ.EXEC",
         L"",
         L"1",
@@ -143,9 +143,9 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"PROJ4 string",
         L"X coordinate",
         L"Y coordinate",
-        L"Output flag: 1 = Longitude 2 = Latitude",
-        L"",
-        L""
+        L"Height",
+        L"Epoch",
+        L"Output flag: 1= Longitude 2 = Latitude, 3 = Height, 4 = Epoch"
     }
 };
 
@@ -396,7 +396,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
     PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
     if (P_for_GIS !=0) {proj_destroy(P);P = P_for_GIS;}
 */
-    c = proj_coord(x, y, 0, HUGE_VAL);
+    c = proj_coord(x, y ,0, HUGE_VAL);
     c_out = proj_trans(P, PJ_FWD, c);
 
     if (c_out.xyzt.x == HUGE_VAL)
@@ -514,7 +514,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src, const doubl
     return (LPXLOPER12)&xResult;
 }
 
-__declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x, const double y, const WORD type)
+__declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x, const double y, const double z, const double t, const WORD type)
 {
     static XLOPER12 xResult;
     PJ *P;
@@ -529,18 +529,28 @@ __declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x
     PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
     if (P_for_GIS !=0)  {proj_destroy(P);P = P_for_GIS;}
 */
-    c = proj_coord(x, y, 0, HUGE_VAL);
+    c = proj_coord(x, y, z, t);
+    if (proj_angular_input (P, PJ_FWD)) {
+      c.lpzt.lam = proj_torad (c.lpzt.lam);
+      c.lpzt.phi = proj_torad (c.lpzt.phi);
+    }
 
     c_out = proj_trans(P, PJ_FWD, c);
     if (c_out.xyzt.x == HUGE_VAL)
       {proj_destroy(P); return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Impossible result value");}
+    if (proj_angular_output (P, PJ_FWD)) {
+        c_out.lpzt.lam =  proj_todeg (c_out.lpzt.lam);
+        c_out.lpzt.phi =  proj_todeg (c_out.lpzt.phi);
+    }
 
     xResult.xltype = xltypeNum;
     switch (type){
-        case 1: xResult.val.num = c_out.xy.x; break;
-        case 2: xResult.val.num = c_out.xy.y; break;
-        default:
-          setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Unknown output type");
+      case 1: xResult.val.num = c_out.xyzt.x; break;
+      case 2: xResult.val.num = c_out.xyzt.y; break;
+      case 3: xResult.val.num = c_out.xyzt.z; break;
+      case 4: xResult.val.num = c_out.xyzt.t; break;
+      default:
+        setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Unknown output type");
     }
     proj_destroy(P);
     return (LPXLOPER12)&xResult;

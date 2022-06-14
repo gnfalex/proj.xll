@@ -9,4 +9,4 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
 __declspec(dllexport) LPXLOPER12 WINAPI projEPSG(const int code);
 __declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src, const double x1, const double y1, const double x2, const double y2, const WORD type);
 __declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src, const double x1, const double y1, const double az1, const double dist, const WORD type);
-__declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x, const double y, const WORD type);
+__declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x, const double y, const double z, const double t, const WORD type);
