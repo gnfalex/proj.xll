@@ -49,9 +49,9 @@ char *xl12string2multibyte (const wchar_t *text, UINT cp)
     inbuff[len_inbuff] = 0;
 
     // Convert to Encoding ()
-    len_outbuff = WideCharToMultiByte(cp,0,inbuff,-1,NULL,0,NULL,NULL);
+    len_outbuff = WideCharToMultiByte(cp, 0, inbuff, -1, NULL, 0, NULL, NULL);
     outbuff = malloc(len_outbuff);
-    WideCharToMultiByte(cp,0,inbuff,-1,outbuff,len_outbuff,NULL,NULL);
+    WideCharToMultiByte(cp, 0, inbuff, -1, outbuff, len_outbuff, NULL, NULL);
 
     free(inbuff);
     return outbuff;
@@ -59,8 +59,32 @@ char *xl12string2multibyte (const wchar_t *text, UINT cp)
 
 int cutFileNameFromPath(char *fpath){
   int i;
-  for (i=strlen(fpath)-1;i>1;i--)
-    if (fpath[i]=='\\'||fpath[i]==0)
+  for (i = strlen(fpath) - 1; i > 1; i--)
+    if (fpath[i] == '\\' || fpath[i] == 0)
       {fpath[i] = 0; break;}
   return i;
+}
+
+void setXLLFolderAsProjDB(){
+    XLOPER12 xXLL;
+    char * cDir;
+    Excel12f(xlGetName, &xXLL, 0);
+    cDir = xl12string2multibyte(xXLL.val.str, PROJ_CODEPAGE);
+    cutFileNameFromPath(cDir);
+    proj_context_set_search_paths (PJ_DEFAULT_CTX, 1, &cDir);
+    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
+    free(cDir);
+}
+
+LPXLOPER12 setError(LPXLOPER12 res, PJ_CONTEXT *ctx, int errtype, char *txt) {
+  if (errtype == xlerrNull) {
+    char buff[1024];
+    sprintf_s(buff, 1024, "#%s (%s)", proj_context_errno_string(ctx, proj_context_errno(ctx)), txt);
+    res->xltype = xltypeStr;
+    res->val.str = new_xl12string(buff);
+  } else {
+    res->xltype = xltypeErr;
+    res->val.err = errtype;
+  }
+  return res;
 }

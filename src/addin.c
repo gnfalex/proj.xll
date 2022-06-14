@@ -17,13 +17,6 @@
 #if PROJ_VERSION_MAJOR < 8
   #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
   #include <proj_api.h>
-#else
-  #include <stdlib.h>
-#endif
-#if PROJ_VERSION_MAJOR <7
-  #define PROJ_CODEPAGE CP_ACP
-#else
-  #define PROJ_CODEPAGE CP_UTF8
 #endif
 
 #include "util.h"
@@ -83,7 +76,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"Destination coordinate system",
         L"X coordinate",
         L"Y coordinate",
-        L"Output flag: 1= Longitude 2 = Latitude, 3 = X, 4 = Y",
+        L"Output flag: 1 = Longitude 2 = Latitude, 3 = X, 4 = Y",
         L""
     },
     {
@@ -118,7 +111,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"Y1 coordinate",
         L"X2 coordinate",
         L"Y2 coordinate",
-        L"Output flag: 1= Distance 2 = Azimuth, 3 = Reverse azimuth"
+        L"Output flag: 1 = Distance 2 = Azimuth, 3 = Reverse azimuth"
     },
     {
         L"projGeodDir",
@@ -135,7 +128,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"Y coordinate",
         L"Azimuth",
         L"Distance",
-        L"Output flag: 1= Longitude 2 = Latitude"
+        L"Output flag: 1 = Longitude 2 = Latitude"
     },
     {
         L"projExec",
@@ -150,7 +143,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"PROJ4 string",
         L"X coordinate",
         L"Y coordinate",
-        L"Output flag: 1= Longitude 2 = Latitude",
+        L"Output flag: 1 = Longitude 2 = Latitude",
         L"",
         L""
     }
@@ -345,7 +338,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
     {
         xResult.xltype = xltypeErr;
         xResult.val.err = xlerrValue;
-        return &xResult;
+        return (LPXLOPER12)&xResult;
     }
 
     double x1 = x;
@@ -397,38 +390,24 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
                                src,
                                dst,
                                NULL);
-    if (P==0) {
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrNum; // Error in pj_transform
-        return (LPXLOPER12)&xResult;
-    }
-
-    {
-        PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
-        if( 0 == P_for_GIS )  {
-            proj_destroy(P);
-            xResult.xltype = xltypeErr;
-            xResult.val.err = xlerrNum; // Error in pj_transform
-            return (LPXLOPER12)&xResult;
-        }
-        proj_destroy(P);
-        P = P_for_GIS;
-    }
-
-    c.lpzt.z = 0.0;
-    c.lpzt.t = HUGE_VAL;
-    c.lpzt.lam = x;
-    c.lpzt.phi = y;
+    if (P==0)
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
+/*
+    PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
+    if (P_for_GIS !=0) {proj_destroy(P);P = P_for_GIS;}
+*/
+    c = proj_coord(x, y, 0, HUGE_VAL);
     c_out = proj_trans(P, PJ_FWD, c);
+
+    if (c_out.xyzt.x == HUGE_VAL)
+      {proj_destroy(P); return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Impossible result value");}
+
     xResult.xltype = xltypeNum;
     switch (type){
       case 1: xResult.val.num = c_out.lp.lam; break;
       case 2: xResult.val.num = c_out.lp.phi; break;
-      case 3: xResult.val.num = c_out.xy.x; break;
-      case 4: xResult.val.num = c_out.xy.y; break;
       default:
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrValue; // Invalid argument
+        setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Unknown output type");
     }
     proj_destroy(P);
 
@@ -461,7 +440,7 @@ __declspec(dllexport) LPXLOPER12 WINAPI projEPSG(const int code)
 // geod
 // ----------------------------------------------------------------------------
 
-__declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src,const double x1, const double y1,const double x2, const double y2,const WORD type)
+__declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src, const double x1, const double y1, const double x2, const double y2, const WORD type)
 {
     static XLOPER12 xResult;
     PJ *P,*Ellips;
@@ -471,25 +450,21 @@ __declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src,const double
     setXLLFolderAsProjDB();
 
     P = proj_create(PJ_DEFAULT_CTX,src);
-    if (P==0) {
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrNum; // Error in pj_transform
-        return (LPXLOPER12)&xResult;
-    }
+    if (P==0)
+      return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
 
     Ellips = proj_get_ellipsoid(PJ_DEFAULT_CTX,P);
-    if (Ellips==0) {
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrNum;
-        proj_destroy(P);
-        return (LPXLOPER12)&xResult;
-    }
+    if (Ellips==0)
+      {proj_destroy(P); return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot extract ellips from PROJ");}
 
-    proj_ellipsoid_get_parameters(PJ_DEFAULT_CTX,Ellips,&a, 0, 0, &invf);
+    proj_ellipsoid_get_parameters(PJ_DEFAULT_CTX, Ellips, &a, 0, 0, &invf);
     proj_destroy(P); proj_destroy(Ellips);
 
     geod_init(&g, a, 1/invf);
-    geod_inverse(&g,x1,y1,x2,y2,&dist,&az1,&az2);
+    geod_inverse(&g, x1, y1, x2, y2, &dist, &az1, &az2);
+
+    if (dist == HUGE_VAL)
+      return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Impossible result value");
 
     xResult.xltype = xltypeNum;
     switch (type){
@@ -497,49 +472,43 @@ __declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src,const double
       case 2: xResult.val.num = az1 ; break;
       case 3: xResult.val.num = az2 ; break;
       default:
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrValue; // Invalid argument
+        setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Unknown output type");
     }
     return (LPXLOPER12)&xResult;
 }
 
 
-__declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src,const double x1, const double y1, const double az1, const double dist, const WORD type)
+__declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src, const double x1, const double y1, const double az1, const double dist, const WORD type)
 {
     static XLOPER12 xResult;
     PJ *P, *Ellips;
     struct geod_geodesic g;
     double a, invf, x2, y2, az2;
 
-
     setXLLFolderAsProjDB();
 
     P = proj_create(PJ_DEFAULT_CTX,src);
-    if (P==0) {
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrNum;
-        return (LPXLOPER12)&xResult;
-    }
+    if (P==0)
+      return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
+
     Ellips = proj_get_ellipsoid(PJ_DEFAULT_CTX,P);
-    if (Ellips==0) {
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrNum;
-        proj_destroy(P);
-        return (LPXLOPER12)&xResult;
-    }
-    proj_ellipsoid_get_parameters(PJ_DEFAULT_CTX,Ellips,&a, 0, 0, &invf);
+    if (Ellips==0) {proj_destroy(P); return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot extract ellips from PROJ");}
+
+    proj_ellipsoid_get_parameters(PJ_DEFAULT_CTX, Ellips, &a, 0, 0, &invf);
     proj_destroy(P); proj_destroy(Ellips);
 
     geod_init(&g, a, 1/invf);
-    geod_direct(&g,x1,y1,az1,dist,&x2,&y2,&az2);
+    geod_direct(&g, x1, y1, az1, dist, &x2, &y2, &az2);
+
+    if (x2 == HUGE_VAL)
+      return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Impossible result value");
 
     xResult.xltype = xltypeNum;
     switch (type){
       case 1: xResult.val.num = x2; break;
       case 2: xResult.val.num = y2; break;
       default:
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrValue; // Invalid argument
+        setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
     }
 
     return (LPXLOPER12)&xResult;
@@ -554,51 +523,25 @@ __declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x
     setXLLFolderAsProjDB();
 
     P = proj_create(PJ_DEFAULT_CTX,src);
-    if (P==0) {
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrNum; // Error in pj_transform
-        return (LPXLOPER12)&xResult;
-    }
+    if (P==0)
+      return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
+/*
+    PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
+    if (P_for_GIS !=0)  {proj_destroy(P);P = P_for_GIS;}
+*/
+    c = proj_coord(x, y, 0, HUGE_VAL);
 
-    {
-        PJ* P_for_GIS = proj_normalize_for_visualization(PJ_DEFAULT_CTX, P);
-        if( 0 == P_for_GIS )  {
-            proj_destroy(P);
-            xResult.xltype = xltypeErr;
-            xResult.val.err = xlerrNum; // Error in pj_transform
-            return (LPXLOPER12)&xResult;
-        }
-        proj_destroy(P);
-        P = P_for_GIS;
-    }
-
-    c.lpzt.z = 0.0;
-    c.lpzt.t = HUGE_VAL;
-    c.lpzt.lam = x;
-    c.lpzt.phi = y;
     c_out = proj_trans(P, PJ_FWD, c);
+    if (c_out.xyzt.x == HUGE_VAL)
+      {proj_destroy(P); return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Impossible result value");}
+
     xResult.xltype = xltypeNum;
     switch (type){
-      case 1: xResult.val.num = c_out.lp.lam; break;
-      case 2: xResult.val.num = c_out.lp.phi; break;
-      case 3: xResult.val.num = c_out.xy.x; break;
-      case 4: xResult.val.num = c_out.xy.y; break;
-      default:
-        xResult.xltype = xltypeErr;
-        xResult.val.err = xlerrValue; // Invalid argument
+        case 1: xResult.val.num = c_out.xy.x; break;
+        case 2: xResult.val.num = c_out.xy.y; break;
+        default:
+          setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Unknown output type");
     }
     proj_destroy(P);
-
     return (LPXLOPER12)&xResult;
-}
-
-void setXLLFolderAsProjDB(){
-    XLOPER12 xXLL;
-    char * cDir;
-    Excel12f(xlGetName, &xXLL, 0);
-    cDir = xl12string2multibyte(xXLL.val.str,PROJ_CODEPAGE);
-    cutFileNameFromPath(cDir);
-    proj_context_set_search_paths (PJ_DEFAULT_CTX,1,&cDir);
-    Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
-    free(cDir);
 }
