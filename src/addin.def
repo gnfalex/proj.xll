@@ -13,3 +13,5 @@ EXPORTS
 	projGeodInv
 	projGeodDir
 	projExec
+	projDeg2DMS
+	projDMS2Deg

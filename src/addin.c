@@ -23,7 +23,7 @@
 #include "epsg.h"
 #include "addin.h"
 
-#define rgWorksheetFuncsRows 7
+#define rgWorksheetFuncsRows 9
 #define rgWorksheetFuncsCols 15
 
 static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
@@ -146,7 +146,42 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"Height",
         L"Epoch",
         L"Output flag: 1= Longitude 2 = Latitude, 3 = Height, 4 = Epoch"
+    },
+    {
+        L"projDeg2DMS",
+        L"UBCCC",
+        L"PROJ.DEG2DMS",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Convert degrees to string representation of degrees, minutes and seconds.",
+        L"Degrees",
+        L"Negative Char (N or E)",
+        L"Positive Char (S or W)",
+        L"Degree Char (°)",
+        L"",
+        L""
+    },
+    {
+        L"projDMS2Deg",
+        L"UC",
+        L"PROJ.DMS2DEG",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Convert string representation of degrees, minutes and seconds to dergees",
+        L"String",
+        L"",
+        L"",
+        L"",
+        L"",
+        L""
     }
+
 };
 
 /*
@@ -558,5 +593,30 @@ __declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x
         setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Unknown output type");
     }
     proj_destroy(P);
+    return (LPXLOPER12)&xResult;
+}
+
+__declspec(dllexport) LPXLOPER12 WINAPI projDeg2DMS(const double deg, const char *pos, const char *neg, const char *dchar)
+{
+    static XLOPER12 xResult;
+    char cResult[20];
+    proj_rtodms(cResult,proj_torad(deg),(int)(unsigned char)(pos[0]!=0?pos[0]:' '),(int)(unsigned char)(neg[0]!=0?neg[0]:' '));
+    for (unsigned int i=0;i<strlen(cResult);i++) {
+      if (cResult[i]=='d') cResult[i] = (dchar[0]!=0?dchar[0]:0xB0);
+    }
+    xResult.xltype = xltypeStr;
+    xResult.val.str = new_xl12string(cResult);
+
+    return (LPXLOPER12)&xResult;
+}
+
+__declspec(dllexport) LPXLOPER12 WINAPI projDMS2Deg(const char *dms)
+{
+    static XLOPER12 xResult;
+    double dResult;
+    char *rs;
+    dResult = proj_todeg(proj_dmstor(dms,&rs));
+    xResult.xltype = xltypeNum;
+    xResult.val.num = dResult;
     return (LPXLOPER12)&xResult;
 }
