@@ -328,7 +328,8 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const cha
 #else
     static XLOPER12 xResult;
 
-    setXLLFolderAsProjDB();
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
 
     projPJ proj_src, proj_dst;
     proj_src = pj_init_plus(src);
@@ -384,7 +385,8 @@ __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, cons
     PJ *P;
     PJ_COORD c, c_out;
 
-    setXLLFolderAsProjDB();
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
 
     P = proj_create_crs_to_crs(PJ_DEFAULT_CTX,
                                src,
@@ -447,7 +449,8 @@ __declspec(dllexport) LPXLOPER12 WINAPI projGeodInv(const char* src, const doubl
     struct geod_geodesic g;
     double a, invf, dist=0, az1=0, az2=0;
 
-    setXLLFolderAsProjDB();
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
 
     P = proj_create(PJ_DEFAULT_CTX,src);
     if (P==0)
@@ -485,7 +488,8 @@ __declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src, const doubl
     struct geod_geodesic g;
     double a, invf, x2, y2, az2;
 
-    setXLLFolderAsProjDB();
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
 
     P = proj_create(PJ_DEFAULT_CTX,src);
     if (P==0)
@@ -520,7 +524,8 @@ __declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x
     PJ *P;
     PJ_COORD c, c_out;
 
-    setXLLFolderAsProjDB();
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
 
     P = proj_create(PJ_DEFAULT_CTX,src);
     if (P==0)

@@ -36,44 +36,102 @@ wchar_t *new_xl12string(const char *text)
     return p;
 }
 
-// Create null-terminated MultiByte string from counted Unicode wchar string
-char *xl12string2multibyte (const wchar_t *text, UINT cp)
+// Create null-terminated Wide Bytes string from counted Unicode wchar string
+wchar_t *xl12string2wbs (const wchar_t *text)
 {
-    wchar_t  *inbuff;
+    wchar_t  *buff;
+    size_t  len_buff;
+
+    len_buff = text[0];
+    buff = (wchar_t *) malloc ( (len_buff + 1) * sizeof (wchar_t) );
+    memcpy (buff, (text + 1), (len_buff) * sizeof(wchar_t));
+    buff[len_buff] = 0;
+    return buff;
+}
+
+char *wbs2mbs (const wchar_t *text, UINT cp)
+{
     size_t  len_inbuff, len_outbuff;
     char *outbuff;
-
-    len_inbuff = text[0];
-    inbuff = (wchar_t *) malloc ( (len_inbuff + 2) * sizeof (wchar_t) );
-    memcpy (inbuff, (text + 1), (len_inbuff) * sizeof(wchar_t));
-    inbuff[len_inbuff] = 0;
-
-    // Convert to Encoding ()
-    len_outbuff = WideCharToMultiByte(cp, 0, inbuff, -1, NULL, 0, NULL, NULL);
+    len_inbuff = wcslen(text);
+    len_outbuff = WideCharToMultiByte(cp, 0, text, -1, NULL, 0, NULL, NULL);
     outbuff = malloc(len_outbuff);
-    WideCharToMultiByte(cp, 0, inbuff, -1, outbuff, len_outbuff, NULL, NULL);
-
-    free(inbuff);
+    WideCharToMultiByte(cp, 0, text, -1, outbuff, len_outbuff, NULL, NULL);
     return outbuff;
 }
 
-int cutFileNameFromPath(char *fpath){
+int cutFileNameFromPathA(char *fpath){
   int i;
   for (i = strlen(fpath) - 1; i > 1; i--)
-    if (fpath[i] == '\\' || fpath[i] == 0)
-      {fpath[i] = 0; break;}
+    if (fpath[i] == '\\') {fpath[i+1] = 0; break;}
   return i;
 }
 
-void setXLLFolderAsProjDB(){
+int cutFileNameFromPathW(wchar_t *fpath){
+  int i;
+  for (i = wcslen(fpath) - 1; i > 1; i--)
+    if (fpath[i] == L'\\') {fpath[i+1] = 0; break;}
+  return i;
+}
+
+
+int setXLLFolderAsProjDB(PJ_CONTEXT *ctx){
+    wchar_t *searchDirW;
     XLOPER12 xXLL;
-    char * cDir;
     Excel12f(xlGetName, &xXLL, 0);
-    cDir = xl12string2multibyte(xXLL.val.str, PROJ_CODEPAGE);
-    cutFileNameFromPath(cDir);
-    proj_context_set_search_paths (PJ_DEFAULT_CTX, 1, &cDir);
+    searchDirW = xl12string2wbs(xXLL.val.str);
     Excel12f(xlFree, 0, 1,  (LPXLOPER12) &xXLL);
-    free(cDir);
+    cutFileNameFromPathW(searchDirW);
+    return setFolderAsProjDBW(searchDirW, ctx);
+}
+
+int setFolderAsProjDBW(wchar_t *searchDirW, PJ_CONTEXT *ctx){
+    wchar_t **outFilesListW = (wchar_t **)malloc(MAX_PATHW);
+    wchar_t *searchMaskW = (wchar_t *)malloc(MAX_PATHW);
+    struct _wfinddata_t fdata;
+    intptr_t fsearch;
+    int cursorPos=0;
+    char *searchDirC;
+    char **outFilesListC;
+    char *projDBC;
+    int errCode;
+
+    wcscpy_s(searchMaskW,MAX_PATHW,searchDirW);
+    wcscat_s(searchMaskW,MAX_PATHW,L"aux*.db");
+
+    if (-1 != (fsearch = _wfindfirst(searchMaskW,&fdata))) {
+      do {
+        outFilesListW[cursorPos] = malloc(MAX_PATHW);
+        wcscpy_s(outFilesListW[cursorPos],MAX_PATHW,searchDirW);
+        wcscat_s(outFilesListW[cursorPos],MAX_PATHW,fdata.name);
+        cursorPos++;
+      } while(0 == (_wfindnext(fsearch,&fdata)));
+      _findclose(fsearch);
+    };
+    outFilesListW[cursorPos]=0;
+
+    searchDirC = wbs2mbs (searchDirW,PROJ_CODEPAGE);
+    outFilesListC = (char **)malloc(cursorPos+1);
+    outFilesListC[cursorPos--]=0;
+
+    for (;cursorPos>=0;cursorPos--) {
+      outFilesListC[cursorPos] = wbs2mbs(outFilesListW[cursorPos],CP_UTF8);
+      free (outFilesListW[cursorPos]);
+    }
+
+    proj_context_set_search_paths (PJ_DEFAULT_CTX, 1, &searchDirC);
+    errCode = proj_context_errno(ctx);
+    if (!errCode) {
+      projDBC = malloc(MAX_PATH);
+      strcpy_s(projDBC,MAX_PATH,searchDirC);
+      strcat_s(projDBC,MAX_PATH,"proj.db");
+      proj_context_set_database_path(PJ_DEFAULT_CTX, projDBC, outFilesListC, NULL);
+      errCode = proj_context_errno(ctx);
+    }
+
+    free (outFilesListW);
+    free (searchMaskW);
+    return errCode;
 }
 
 LPXLOPER12 setError(LPXLOPER12 res, PJ_CONTEXT *ctx, int errtype, char *txt) {
