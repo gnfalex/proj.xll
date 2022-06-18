@@ -43,6 +43,74 @@ EPSG codes are also supported using the `EPSG()` helper function. For example, t
 =PROJ.TRANSFORM(EPSG(4326),EPSG(3857),RADIANS(-89.83152841),RADIANS(40.91627447),2)
 ```
 
+New functions depends from proj.db and (optionaly) aux\*.db near xll. Accept as input PROJ string, WKT or datum.
+
+
+
+To transform coordinates, for example from latitude/longitude to UTM zone 17:
+```
+=PROJ.TRANSFORMv6("EPSG:4326","+proj=utm +zone=17 +datum=WGS84",RADIANS(-80),RADIANS(40),1)
+```
+Arguments:
+1. Source coordinate system
+2. Destination coordinate system
+3. X value
+4. Y value
+5. Output: 1=X, 2=Y
+
+To find distance (or azimuth) between points:
+```
+=PROJ.GEOD_INV("EPSG:4326",52,45,53,45,1)
+```
+Arguments:
+1. Coordinate system
+2. X1 coordinate
+3. Y1 coordinate
+4. X2 coordinate
+5. Y2 coordinate
+6. Output flag: 1 = Distance 2 = Azimuth, 3 = Reverse azimuth
+
+To find coordinates of second point (with known distance and azimuth):
+```
+=PROJ.GEOD_DIR("EPSG:4326",52,45,45,100,1)
+```
+Arguments:
+1. Coordinate system
+2. X1 coordinate
+3. Y1 coordinate
+4. Azimuth
+5. Distance
+6. Output flag: 1 = Longitude 2 = Latitude
+
+To apply PROJ string to coordinates
+```
+=PROJ.EXEC("+proj=pipeline +ellps=GRS80 +step +proj=cart +step +proj=helmert +x=10 +y=3 +z=1 +step +proj=cart +inv +step +proj=merc";55;42;100;2022;1)
+```
+Arguments:
+1. PROJ4 string
+2. X coordinate
+3. Y coordinate
+4. Height
+5. Epoch
+6. Output flag: 1= Longitude 2 = Latitude, 3 = Height, 4 = Epoch
+
+To convert degrees to string representation of degrees, minutes and seconds.
+```
+=PROJ.DEG2DMS (53.133,"E","W","d")
+```
+Arguments:
+1. Degrees
+2. Negative Char (optional, N or E)
+3. Positive Char (optional, S or W)
+4. Degree Char (optional, ° as default)
+
+```
+=PROJ.DMS2DEG("45d12'45")
+=PROJ.DMS2DEG("45°12'45")
+```
+Arguments:
+1. String
+
 Development
 -----------
 
