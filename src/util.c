@@ -96,6 +96,10 @@ int setFolderAsProjDBW(wchar_t *searchDirW, PJ_CONTEXT *ctx){
     char *projDBC;
     int errCode;
 
+    searchDirC = wbs2mbs (searchDirW,PROJ_CODEPAGE);
+    if (strstr(searchDirC,proj_context_get_database_path(ctx))!=NULL)
+      return 0;
+
     wcscpy_s(searchMaskW,MAX_PATHW,searchDirW);
     wcscat_s(searchMaskW,MAX_PATHW,L"aux*.db");
 
@@ -110,7 +114,7 @@ int setFolderAsProjDBW(wchar_t *searchDirW, PJ_CONTEXT *ctx){
     };
     outFilesListW[cursorPos]=0;
 
-    searchDirC = wbs2mbs (searchDirW,PROJ_CODEPAGE);
+
     outFilesListC = (char **)malloc(cursorPos+1);
     outFilesListC[cursorPos--]=0;
 
