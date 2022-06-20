@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <windows.h>
 #include <math.h>
+#include <malloc.h>
 #include <shlwapi.h>
 
 // XLL
@@ -23,7 +24,7 @@
 #include "util.h"
 #include "epsg.h"
 
-#define rgWorksheetFuncsRows 9
+#define rgWorksheetFuncsRows 12
 #define rgWorksheetFuncsCols 15
 
 __declspec(dllexport) int WINAPI xlAutoOpen(void);
@@ -41,3 +42,6 @@ __declspec(dllexport) LPXLOPER12 WINAPI projGeodDir(const char* src, const doubl
 __declspec(dllexport) LPXLOPER12 WINAPI projExec(const char* src, const double x, const double y, const double z, const double t, const WORD type);
 __declspec(dllexport) LPXLOPER12 WINAPI projDeg2DMS(const double deg, const char *pos, const char *neg, const char *dchar);
 __declspec(dllexport) LPXLOPER12 WINAPI projDMS2Deg(const char *dms);
+__declspec(dllexport) LPXLOPER12 WINAPI projGetCRSList(char *AuthFilter, char *NameFilter, int fCol, int fRow);
+__declspec(dllexport) LPXLOPER12 WINAPI projGetCRSListSize(char *AuthFilter, char *NameFilter);
+__declspec(dllexport) LPXLOPER12 WINAPI projTransformInfo(char *src, char *dest, double x, double y);

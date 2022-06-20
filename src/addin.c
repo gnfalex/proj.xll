@@ -154,8 +154,58 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
         L"",
         L"",
         L""
+    },
+   {
+        L"projGetCRSListSize",
+        L"UCC",
+        L"PROJ.GETCRSLISTSIZE",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Return size of list of possible CRS",
+        L"Authority name ('EPSG' for example)",
+        L"String to search in CRS name",
+        L"",
+        L"",
+        L"",
+        L""
+    },
+   {
+        L"projGetCRSList",
+        L"QCCII",
+        L"PROJ.GETCRSLIST",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Return list of possible CRS",
+        L"Authority name ('EPSG' for example)",
+        L"String to search in CRS name",
+        L"",
+        L"",
+        L"",
+        L""
+    },
+   {
+        L"projTransformInfo",
+        L"UCCBB",
+        L"PROJ.TRANSFORMINFO",
+        L"",
+        L"1",
+        L"PROJ",
+        L"",
+        L"",
+        L"Return Transformation Info",
+        L"Source coordinate system",
+        L"Destination coordinate system (or nothing)",
+        L"X coordinate, if destination coordinate system is used",
+        L"Y coordinate, if destination coordinate system is used",
+        L"",
+        L""
     }
-
 };
 
 /*
@@ -618,5 +668,133 @@ __declspec(dllexport) LPXLOPER12 WINAPI projDMS2Deg(const char *dms)
     dResult = proj_todeg(proj_dmstor(dms,&rs));
     xResult.xltype = xltypeNum;
     xResult.val.num = dResult;
+    return (LPXLOPER12)&xResult;
+}
+
+__declspec(dllexport) LPXLOPER12 WINAPI projGetCRSListSize(char *AuthFilter, char *NameFilter)
+{
+    static XLOPER12 xResult;
+    int i;
+
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
+
+    PROJ_CRS_INFO **resList;
+    int resCount;
+    char resStr[1024];
+    resList = proj_get_crs_info_list_from_database(PJ_DEFAULT_CTX, (AuthFilter==""?NULL:AuthFilter), NULL, &resCount);
+
+    if (resList==NULL && proj_context_errno(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Error with proj_get_crs_info_list");
+
+    if (NameFilter[0])
+      for (i = resCount - 1; i >= 0; i--)
+        if (!StrStrIA(resList[i]->name, NameFilter))
+          resCount--;
+
+    proj_crs_info_list_destroy(resList);
+
+    sprintf_s(resStr, 1024, "%dx%d", resCount, 3);
+    xResult.xltype = xltypeStr;
+    xResult.val.str = new_xl12string(resStr);
+    return (LPXLOPER12)&xResult;
+}
+
+__declspec(dllexport) LPXLOPER12 WINAPI projGetCRSList(char *AuthFilter, char *NameFilter, int fCol, int fRow)
+{
+    LPXLOPER12 pxArray;
+    static XLOPER12 xResult;
+    XLOPER12 xRef;
+    int rwcol;
+    int i,pos;
+
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases. ");
+
+    PROJ_CRS_INFO **resList;
+    PROJ_CRS_INFO *resInfo;
+    int resCount;
+
+    resList = proj_get_crs_info_list_from_database(PJ_DEFAULT_CTX, (AuthFilter[0]?AuthFilter:NULL), NULL, &resCount);
+    if (resList==NULL && proj_context_errno(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Error with proj_get_crs_info_list");
+
+    xResult.xltype = xltypeMulti | xlbitDLLFree;
+    xResult.val.array.rows = resCount;
+    xResult.val.array.columns = 3;
+
+    if (NameFilter[0]) {
+      for (i = resCount - 1; i >= 0; i--) {
+        if (!StrStrIA(resList[i]->name,NameFilter))
+          xResult.val.array.rows--;
+      }
+    }
+
+    rwcol = xResult.val.array.columns * xResult.val.array.rows;
+    pxArray = malloc(rwcol * sizeof(XLOPER12));
+    xResult.val.array.lparray = pxArray;
+
+    for(i = 0,pos = 0; i < resCount; i++) {
+      resInfo = resList[i];
+      if (!NameFilter[0] || StrStrIA(resList[i]->name, NameFilter)) {
+        pxArray[xResult.val.array.columns*pos+0].xltype  = xltypeStr;
+        pxArray[xResult.val.array.columns*pos+0].val.str = new_xl12string(resInfo->auth_name);
+        pxArray[xResult.val.array.columns*pos+1].xltype  = xltypeStr;
+        pxArray[xResult.val.array.columns*pos+1].val.str = new_xl12string(resInfo->code);
+        pxArray[xResult.val.array.columns*pos+2].xltype  = xltypeStr;
+        pxArray[xResult.val.array.columns*pos+2].val.str = new_xl12string(resInfo->name);
+        pos++;
+      }
+    }
+
+    xRef.xltype = xltypeSRef;
+    xRef.val.sref.count = rwcol;
+    xRef.val.sref.ref.rwFirst = fRow;
+    xRef.val.sref.ref.rwLast = xRef.val.sref.ref.rwFirst + xResult.val.array.rows - 1;
+    xRef.val.sref.ref.colFirst = fCol;
+    xRef.val.sref.ref.colLast = xRef.val.sref.ref.colFirst + xResult.val.array.columns - 1;
+
+    Excel12(xlSet, 0, 2, (LPXLOPER12)&xRef, (LPXLOPER12)&xResult);
+
+    proj_crs_info_list_destroy(resList);
+
+    return (LPXLOPER12)&xResult;
+}
+
+__declspec(dllexport) LPXLOPER12 WINAPI projTransformInfo(char *src, char *dst, double x, double y)
+{
+    static XLOPER12 xResult;
+    PJ *P;
+    PJ_PROJ_INFO pInfo;
+    char buff[32*1024-1];
+
+    xResult.xltype = xltypeStr;
+
+    if (setXLLFolderAsProjDB(PJ_DEFAULT_CTX))
+      return (LPXLOPER12) setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot init databases.");
+
+    if (!dst[0]) {
+      P = proj_create(PJ_DEFAULT_CTX, src);
+    } else {
+      PJ_COORD c;
+      P = proj_create_crs_to_crs(PJ_DEFAULT_CTX, src, dst, NULL);
+      if (P==0)
+        return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
+      c = proj_coord(x, y ,0, HUGE_VAL);
+      c = proj_trans(P, PJ_FWD, c);
+      if (c.xyzt.x == HUGE_VAL)
+        {proj_destroy(P); return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Impossible result value");}
+    }
+
+    if (P==0)
+      return (LPXLOPER12)setError(&xResult, PJ_DEFAULT_CTX, xlerrNull, "Cannot create PROJ");
+
+    pInfo = proj_pj_info(P);
+    xResult.xltype = xltypeStr;
+    sprintf_s(buff, 32*1024-1, "ID:\r\n\t%s\r\nDescription:\r\n\t%s\r\nDefinition:\r\n\t%s\r\nAccuracy:\r\n\t%f\r\nProj string:\r\n\t%s",pInfo.id,pInfo.description,pInfo.definition,pInfo.accuracy,proj_as_proj_string(PJ_DEFAULT_CTX, P, PJ_PROJ_5, NULL));
+    xResult.val.str = new_xl12string(buff);
+
+    proj_destroy(P);
+
     return (LPXLOPER12)&xResult;
 }

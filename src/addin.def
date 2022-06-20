@@ -6,7 +6,7 @@ EXPORTS
 	xlAutoRegister12
 	xlAutoAdd
 	xlAutoRemove
-	xlAutoFree12
+        xlAutoFree12
 	projVersion
 	projTransform
 	projTransform_api6
@@ -16,3 +16,6 @@ EXPORTS
 	projExec
 	projDeg2DMS
 	projDMS2Deg
+        projGetCRSListSize
+        projGetCRSList
+        projTransformInfo

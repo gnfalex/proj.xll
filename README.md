@@ -111,6 +111,47 @@ Arguments:
 Arguments:
 1. String
 
+To get count of CRS, filtered by Authority name and CRS name.
+Result returned in form (%NumberOfRows%X%NumberOrColumns%). "21x3".
+```
+=PROJ.GETCRSLISTSIZE()
+=PROJ.GETCRSLISTSIZE("EPSG")
+=PROJ.GETCRSLISTSIZE("EPSG","PZ")
+=PROJ.GETCRSLISTSIZE("","PZ")
+```
+Arguments:
+1. Auhority name (or "")
+2. Part of CRS name for ignorecase search (or "")
+
+To get list of CRS, filtered by Authority name and CRS name.
+Return result as array, so can be used directly (Select area, enter formula, press Ctrl+Shift+Enter)
+Or via Macros Application.Run to fill current sheet.
+```
+=PROJ.GETCRSLIST()
+=PROJ.GETCRSLIST("EPSG")
+=PROJ.GETCRSLIST("EPSG","PZ")
+=PROJ.GETCRSLIST(,"PZ")
+Application.Run ("PROJ.GETCRSLIST","EPSG","PZ",0,0)
+```
+Arguments:
+1. Auhority name (or "")
+2. Part of CRS name for ignorecase search (or "")
+3. First column to fill starting from 0 (column "A")
+4. First column to fill starting from 0 (row "1")
+
+To get info about transformation
+```
+=PROJ.TRANSFORMINFO("EPSG:4326")
+=PROJ.TRANSFORMINFO("EPSG:4326","EPSG:4236",50,50)
+```
+Arguments:
+1. Coordinate system or transformation name.
+2. Destination coordinate system (if first argument is CRS)
+3. X value (if first argument is CRS)
+4. Y value (if first argument is CRS)
+
+
+
 Development
 -----------
 
