@@ -1,8 +1,37 @@
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRALEAN
+#define _USE_MATH_DEFINES
+
+#include <ctype.h>
+#include <windows.h>
+#include <math.h>
+#include <shlwapi.h>
+
+// XLL
+#include <XLCALL.H>
+#include <FRAMEWRK.H>
+
+// PROJ
+#include <proj.h>
+#include <geodesic.h>
+#if PROJ_VERSION_MAJOR < 8
+  #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
+  #include <proj_api.h>
+#endif
+
+#include "util.h"
+#include "epsg.h"
+
+#define rgWorksheetFuncsRows 9
+#define rgWorksheetFuncsCols 15
+
 __declspec(dllexport) int WINAPI xlAutoOpen(void);
 __declspec(dllexport) int WINAPI xlAutoClose(void);
 __declspec(dllexport) LPXLOPER12 WINAPI xlAutoRegister12(LPXLOPER12 pxName);
 __declspec(dllexport) int WINAPI xlAutoAdd(void);
 __declspec(dllexport) int WINAPI xlAutoRemove(void);
+__declspec(dllexport) void WINAPI xlAutoFree12(LPXLOPER12 pxFree);
 __declspec(dllexport) LPXLOPER12 WINAPI projVersion(LPXLOPER12 x);
 __declspec(dllexport) LPXLOPER12 WINAPI projTransform(const char* src, const char* dst, const double x, const double y, const WORD type);
 __declspec(dllexport) LPXLOPER12 WINAPI projTransform_api6(const char* src, const char* dst, const double x, const double y, const WORD type);

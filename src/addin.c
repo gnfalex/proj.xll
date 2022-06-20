@@ -1,30 +1,4 @@
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#define _USE_MATH_DEFINES
-
-#include <ctype.h>
-#include <windows.h>
-#include <math.h>
-
-// XLL
-#include <XLCALL.H>
-#include <FRAMEWRK.H>
-
-// PROJ
-#include <proj.h>
-#include <geodesic.h>
-#if PROJ_VERSION_MAJOR < 8
-  #define ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
-  #include <proj_api.h>
-#endif
-
-#include "util.h"
-#include "epsg.h"
 #include "addin.h"
-
-#define rgWorksheetFuncsRows 9
-#define rgWorksheetFuncsCols 15
 
 static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
 {
@@ -192,6 +166,7 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
 ** - xlAutoAdd
 ** - xlAutoRemove
 ** - xlAddInManagerInfo12
+** - xlAutoFree12
 **
 ** UDFs:
 ** - projTransform
@@ -201,6 +176,8 @@ static LPWSTR rgWorksheetFuncs[rgWorksheetFuncsRows][rgWorksheetFuncsCols] =
 ** - projGeodInv
 ** - projGeodFor
 ** - projExec
+** - projDMS2Deg
+** - projDeg2DMS
 */
 
 // Excel calls xlAutoOpen when it loads the XLL.
@@ -333,6 +310,29 @@ __declspec(dllexport) int WINAPI xlAutoAdd(void)
 __declspec(dllexport) int WINAPI xlAutoRemove(void)
 {
     return 1;
+}
+
+// Try to free Excel array result
+__declspec(dllexport) void WINAPI xlAutoFree12(LPXLOPER12 pxFree)
+{
+    if(pxFree->xltype & xltypeMulti)
+    {
+        int size = pxFree->val.array.rows *
+            pxFree->val.array.columns;
+        LPXLOPER12 p = pxFree->val.array.lparray;
+        for(; size-- > 0; p++)
+            if(p->xltype == xltypeStr)
+                free(p->val.str);
+        free(pxFree->val.array.lparray);
+    }
+    else if(pxFree->xltype & xltypeStr)
+    {
+        free(pxFree->val.str);
+    }
+    else if(pxFree->xltype & xltypeRef)
+    {
+        free(pxFree->val.mref.lpmref);
+    }
 }
 
 // ----------------------------------------------------------------------------

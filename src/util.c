@@ -148,5 +148,6 @@ LPXLOPER12 setError(LPXLOPER12 res, PJ_CONTEXT *ctx, int errtype, char *txt) {
     res->xltype = xltypeErr;
     res->val.err = errtype;
   }
+  proj_errno_reset(NULL);
   return res;
 }

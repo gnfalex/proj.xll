@@ -6,6 +6,7 @@ EXPORTS
 	xlAutoRegister12
 	xlAutoAdd
 	xlAutoRemove
+	xlAutoFree12
 	projVersion
 	projTransform
 	projTransform_api6
